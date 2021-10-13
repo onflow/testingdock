@@ -76,7 +76,7 @@ func (n *Network) start(ctx context.Context) {
 	// start child containers
 	if SpawnSequential {
 		for _, cont := range n.children {
-			cont.start(ctx)
+			cont.Start(ctx)
 		}
 	} else {
 		printf("(setup ) %-25s (%s) - network is spawning %d child containers in parallel", n.name, n.id, len(n.children))
@@ -87,7 +87,7 @@ func (n *Network) start(ctx context.Context) {
 		for _, cont := range n.children {
 			go func(cont *Container) {
 				defer wg.Done()
-				cont.start(ctx)
+				cont.Start(ctx)
 			}(cont)
 		}
 		wg.Wait()

@@ -158,8 +158,8 @@ func newContainer(t testing.TB, c *client.Client, opts ContainerOpts) *Container
 	return cont
 }
 
-// start actually starts a docker container. This may also pull images.
-func (c *Container) start(ctx context.Context) { // nolint: gocyclo
+// Start actually starts a docker container. This may also pull images.
+func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 	if c.network == nil {
 		c.t.Fatalf("Container %s not added to any network!", c.Name)
 	}
@@ -271,7 +271,7 @@ func (c *Container) start(ctx context.Context) { // nolint: gocyclo
 	// start children
 	if SpawnSequential {
 		for _, cont := range c.children {
-			cont.start(ctx)
+			cont.Start(ctx)
 		}
 	} else {
 		printf("(setup ) %-25s (%s) - container is spawning %d child containers in parallel", c.Name, c.ID, len(c.children))
@@ -282,7 +282,7 @@ func (c *Container) start(ctx context.Context) { // nolint: gocyclo
 		for _, cont := range c.children {
 			go func(cont *Container) {
 				defer wg.Done()
-				cont.start(ctx)
+				cont.Start(ctx)
 			}(cont)
 		}
 		wg.Wait()
