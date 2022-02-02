@@ -136,6 +136,12 @@ func (n *Network) initialCleanup(ctx context.Context) {
 			n.t.Fatalf("network with name %s already exists, but wasn't started by tesingdock, aborting!", n.name)
 		}
 	}
+
+	reports, err := n.cli.NetworksPrune(ctx, filters.NewArgs())
+	if err != nil {
+		n.t.Fatalf("network prune failure: %s", err.Error())
+	}
+	printf("%v network prune report: %v", time.Now().UTC(), reports)
 }
 
 // Closes the docker network. This also closes the
