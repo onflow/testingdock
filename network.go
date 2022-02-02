@@ -113,11 +113,16 @@ func (n *Network) initialCleanup(ctx context.Context) {
 			for _, nnn := range cc.NetworkSettings.Networks {
 				if nnn.NetworkID == nn.ID {
 					if isOwnedByTestingdock(cc.Labels) {
+						timeout := time.Second * 10
+						err = n.cli.ContainerStop(ctx, cc.ID, &timeout)
+						if err != nil {
+							n.t.Fatalf("testingdock: container stop failure: %s", err.Error())
+						}
 						if err = n.cli.ContainerRemove(ctx, cc.ID, types.ContainerRemoveOptions{
 							RemoveVolumes: true,
 							Force:         true,
 						}); err != nil {
-							n.t.Fatalf("container removal failure: %s", err.Error())
+							n.t.Fatalf("testingdock: container removal failure: %s", err.Error())
 						}
 						printf("(setup ) %-25s (%s) - network endpoint removed: %s", nn.Name, nn.ID, cc.Names[0])
 					} else {
