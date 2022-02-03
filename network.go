@@ -49,7 +49,7 @@ func (n *Network) start(ctx context.Context) {
 		Labels: n.labels,
 	})
 	if err != nil {
-		n.t.Fatalf("network creation failure: %s", err.Error())
+		n.t.Fatalf("testingdock: network creation failure: %s", err.Error())
 	}
 	n.id = res.ID
 	n.cancel = func() {
@@ -57,7 +57,7 @@ func (n *Network) start(ctx context.Context) {
 			return
 		}
 		if err := n.cli.NetworkRemove(ctx, n.id); err != nil {
-			n.t.Fatalf("network removal failure: %s", err.Error())
+			n.t.Fatalf("testingdock: network removal failure: %s", err.Error())
 		}
 		printf("(cancel) %-25s (%s) - network removed", n.name, n.id)
 	}
@@ -68,7 +68,7 @@ func (n *Network) start(ctx context.Context) {
 	})
 	if err != nil {
 		n.cancel()
-		n.t.Fatalf("network inspect failure: %s", err.Error())
+		n.t.Fatalf("testingdock: network inspect failure: %s", err.Error())
 	}
 	n.gateway = ni.IPAM.Config[0].Gateway
 	printf("(setup ) %-25s (%s) - network got gateway ip: %s", n.name, n.id, n.gateway)
@@ -102,12 +102,12 @@ func (n *Network) initialCleanup(ctx context.Context) {
 
 	networks, err := n.cli.NetworkList(ctx, types.NetworkListOptions{Filters: networkListArgs})
 	if err != nil {
-		n.t.Fatalf("network listing failure: %s", err.Error())
+		n.t.Fatalf("testingdock: network listing failure: %s", err.Error())
 	}
 	for _, nn := range networks {
 		containers, err := n.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
 		if err != nil {
-			n.t.Fatalf("container list failure: %s", err.Error())
+			n.t.Fatalf("testingdock: container list failure: %s", err.Error())
 		}
 		for _, cc := range containers {
 			for _, nnn := range cc.NetworkSettings.Networks {
@@ -126,7 +126,7 @@ func (n *Network) initialCleanup(ctx context.Context) {
 						}
 						printf("(setup ) %-25s (%s) - network endpoint removed: %s", nn.Name, nn.ID, cc.Names[0])
 					} else {
-						n.t.Fatalf("container with ID %s already exists, but wasn't started by tesingdock, aborting!", cc.ID)
+						n.t.Fatalf("testingdock: container with ID %s already exists, but wasn't started by tesingdock, aborting!", cc.ID)
 					}
 				}
 			}
@@ -134,17 +134,17 @@ func (n *Network) initialCleanup(ctx context.Context) {
 
 		if isOwnedByTestingdock(nn.Labels) {
 			if err = n.cli.NetworkRemove(ctx, nn.ID); err != nil {
-				n.t.Fatalf("network removal failure: %s", err.Error())
+				n.t.Fatalf("testingdock: network removal failure: %s", err.Error())
 			}
 			printf("(setup ) %-25s (%s) - network removed", nn.Name, nn.ID)
 		} else {
-			n.t.Fatalf("network with name %s already exists, but wasn't started by tesingdock, aborting!", n.name)
+			n.t.Fatalf("testingdock: network with name %s already exists, but wasn't started by tesingdock, aborting!", n.name)
 		}
 	}
 
 	reports, err := n.cli.NetworksPrune(ctx, filters.NewArgs())
 	if err != nil {
-		n.t.Fatalf("network prune failure: %s", err.Error())
+		n.t.Fatalf("testingdock: network prune failure: %s", err.Error())
 	}
 	printf("%v network prune report: %v", time.Now().UTC(), reports)
 }

@@ -73,7 +73,7 @@ func GetOrCreateSuite(t testing.TB, name string, opts SuiteOpts) (*Suite, bool) 
 			if opts.Skip {
 				t.Skipf("docker client instantiation failure: %s", err.Error())
 			} else {
-				t.Fatalf("docker client instantiation failure: %s", err.Error())
+				t.Fatalf("testingdock: docker client instantiation failure: %s", err.Error())
 			}
 		}
 	}

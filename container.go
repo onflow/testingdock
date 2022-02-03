@@ -161,7 +161,7 @@ func newContainer(t testing.TB, c *client.Client, opts ContainerOpts) *Container
 // Start actually starts a docker container. This may also pull images.
 func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 	if c.network == nil {
-		c.t.Fatalf("Container %s not added to any network!", c.Name)
+		c.t.Fatalf("testingdock: Container %s not added to any network!", c.Name)
 	}
 
 	imageListArgs := filters.NewArgs()
@@ -169,20 +169,20 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 
 	images, err := c.cli.ImageList(ctx, types.ImageListOptions{Filters: imageListArgs})
 	if err != nil {
-		c.t.Fatalf("image listing failure: %s", err.Error())
+		c.t.Fatalf("testingdock: image listing failure: %s", err.Error())
 	}
 
 	if len(images) == 0 || c.forcePull {
 		printf("(setup ) %-25s - pulling image", c.ccfg.Image)
 		img, err := c.imagePull(ctx)
 		if err != nil {
-			c.t.Fatalf("image downloading failure of '%s': %s", c.ccfg.Image, err.Error())
+			c.t.Fatalf("testingdock: image downloading failure of '%s': %s", c.ccfg.Image, err.Error())
 		}
 		if _, err = io.Copy(ioutil.Discard, img); err != nil {
 			c.t.Fatalf("image pull response read failure: %s", err.Error())
 		}
 		if err = img.Close(); err != nil {
-			c.t.Fatalf("image closing failure: %s", err.Error())
+			c.t.Fatalf("testingdock: image closing failure: %s", err.Error())
 		}
 		printf("(setup) %-25s - successfully pulled image", c.ccfg.Image)
 	}
@@ -194,7 +194,7 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 
 	cont, err := c.cli.ContainerCreate(ctx, c.ccfg, &hcfg, nil, c.Name)
 	if err != nil {
-		c.t.Fatalf("container creation failure: %s", err.Error())
+		c.t.Fatalf("testingdock: container creation failure: %s", err.Error())
 	}
 
 	c.ID = cont.ID
@@ -204,19 +204,19 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 			return
 		}
 		if err := c.cli.NetworkDisconnect(ctx, c.network.id, c.ID, true); err != nil {
-			c.t.Fatalf("container disconnect failure: %s", err.Error())
+			c.t.Fatalf("testingdock: container disconnect failure: %s", err.Error())
 		}
 		printf("(cancel) %-25s (%s) - container disconnected from: %s", c.Name, c.ID, c.network.name)
 		timeout := time.Second * 5
 		if err := c.cli.ContainerStop(ctx, c.ID, &timeout); err != nil {
-			c.t.Fatalf("container stop failure: %s", err.Error())
+			c.t.Fatalf("testingdock: container stop failure: %s", err.Error())
 		}
 		printf("(cancel) %-25s (%s) - container stopped", c.Name, c.ID)
 	}
 
 	// start the container finally
 	if err = c.cli.ContainerStart(ctx, c.ID, types.ContainerStartOptions{}); err != nil {
-		c.t.Fatalf("container start failure: %s", err.Error())
+		c.t.Fatalf("testingdock: container start failure: %s", err.Error())
 	}
 
 	c.closed = false
@@ -233,7 +233,7 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 				Follow:     true,
 			})
 			if gerr != nil {
-				c.t.Fatalf("container logging failure: %s", gerr.Error())
+				c.t.Fatalf("testingdock: container logging failure: %s", gerr.Error())
 			}
 			printf("(loggi ) %-25s (%s) - container logging started", c.Name, c.ID)
 
@@ -261,7 +261,7 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 				}
 
 				// unknown error, log as fatal
-				c.t.Fatalf("container logging failure: %s", serr.Error())
+				c.t.Fatalf("testingdock: container logging failure: %s", serr.Error())
 			}
 		}()
 	}
@@ -310,7 +310,7 @@ func findContainerByName(ctx context.Context, cli *client.Client, name string) (
 func (c *Container) initialCleanup(ctx context.Context) {
 	containers, err := findContainerByName(ctx, c.cli, c.Name)
 	if err != nil {
-		c.t.Fatalf("container listing failure: %s", err.Error())
+		c.t.Fatalf("testingdock: container listing failure: %s", err.Error())
 	}
 	for _, cont := range containers {
 		if isOwnedByTestingdock(cont.Labels) {
@@ -319,11 +319,11 @@ func (c *Container) initialCleanup(ctx context.Context) {
 				RemoveVolumes: true,
 				RemoveLinks:   false,
 			}); err != nil {
-				c.t.Fatalf("container removal failure: %s", err.Error())
+				c.t.Fatalf("testingdock: container removal failure: %s", err.Error())
 			}
 			printf("(setup ) %-25s (%s) - container removed", cont.Names[0], cont.ID)
 		} else {
-			c.t.Fatalf("container with name %s already exists, but wasn't started by tesingdock, aborting!", c.Name)
+			c.t.Fatalf("testingdock: container with name %s already exists, but wasn't started by tesingdock, aborting!", c.Name)
 		}
 	}
 }
@@ -361,7 +361,7 @@ func (c *Container) close() error {
 // remove removes/cleans up the container
 func (c *Container) remove() {
 	if !c.closed {
-		c.t.Fatalf("container removal failed, please close containers first")
+		c.t.Fatalf("testingdock: container removal failed, please close containers first")
 	}
 
 	if SpawnSequential {
@@ -389,7 +389,7 @@ func (c *Container) remove() {
 		Force:         true,
 		RemoveVolumes: true,
 	}); err != nil {
-		c.t.Fatalf("container removal failure: %s", err.Error())
+		c.t.Fatalf("testingdock: container start: container removal failure: %s", err.Error())
 	}
 	c.removed = true
 	printf("(remove ) %-25s (%s) - container removed/cleaned up", c.Name, c.ID)
@@ -407,7 +407,7 @@ func (c *Container) After(cc *Container) {
 // Aborts early if there is any error during reset.
 func (c *Container) reset(ctx context.Context) {
 	if err := c.resetF(ctx, c); err != nil {
-		c.t.Fatalf("container reset failure: %s", err.Error())
+		c.t.Fatalf("testingdock: container reset failure: %s", err.Error())
 	}
 
 	c.closed = false
@@ -483,11 +483,11 @@ func getCredentialsFromConfig(domain string) (string, error) {
 	dcfg, ok := cfg.AuthConfigs[domain]
 
 	if !ok {
-		return "", fmt.Errorf("domain %s does not exist in config", domain)
+		return "", fmt.Errorf("testingdock: domain %s does not exist in config", domain)
 	}
 
 	if dcfg.Password == "" {
-		return "", fmt.Errorf("no password set")
+		return "", fmt.Errorf("testingdock: no password set")
 	}
 
 	type SecToken struct {
@@ -501,7 +501,7 @@ func getCredentialsFromConfig(domain string) (string, error) {
 	var jsonToken []byte
 	jsonToken, err = json.Marshal(token)
 	if err != nil {
-		return "", fmt.Errorf("internal error: failed to marshal json: %s", err)
+		return "", fmt.Errorf("testingdock: internal error: failed to marshal json: %s", err)
 	}
 
 	return b64.StdEncoding.EncodeToString(jsonToken), nil
@@ -517,7 +517,7 @@ func healthCheckRunning() HealthCheckFunc {
 		}
 
 		if !cjson.ContainerJSONBase.State.Running {
-			return fmt.Errorf("container not running")
+			return fmt.Errorf("testingdock: container not running")
 		}
 		return nil
 	}
