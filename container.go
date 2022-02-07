@@ -389,7 +389,7 @@ func (c *Container) remove() {
 		Force:         true,
 		RemoveVolumes: true,
 	}); err != nil {
-		c.t.Fatalf("testingdock: container start: container removal failure: %s", err.Error())
+		c.t.Fatalf("testingdock: container removal failure: %s", err.Error())
 	}
 	c.removed = true
 	printf("(remove ) %-25s (%s) - container removed/cleaned up", c.Name, c.ID)
