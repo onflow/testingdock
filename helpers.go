@@ -5,11 +5,12 @@ import (
 	"net"
 	"strconv"
 	"testing"
+	"time"
 )
 
 // printf just wraps fmt.Printf.
 func printf(format string, args ...interface{}) {
-	fmt.Printf("··· DOCK: %s\n", fmt.Sprintf(format, args...))
+	fmt.Printf("··· DOCK: %v %s\n", time.Now().UTC(), fmt.Sprintf(format, args...))
 }
 
 // RandomPort returns a random available port as a string.
