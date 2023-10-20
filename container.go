@@ -66,7 +66,7 @@ type ResetFunc func(ctx context.Context, c *Container) error
 // resetRestart is a pre-implemented ResetFunc, which just restarts the container.
 func resetRestart() ResetFunc {
 	return func(ctx context.Context, c *Container) error {
-		return c.cli.ContainerRestart(ctx, c.ID, nil)
+		return c.cli.ContainerRestart(ctx, c.ID, container.StopOptions{})
 	}
 }
 
@@ -192,7 +192,7 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 	hcfg := *c.hcfg
 	hcfg.NetworkMode = container.NetworkMode(c.network.name)
 
-	cont, err := c.cli.ContainerCreate(ctx, c.ccfg, &hcfg, nil, c.Name)
+	cont, err := c.cli.ContainerCreate(ctx, c.ccfg, &hcfg, nil, nil, c.Name)
 	if err != nil {
 		c.t.Fatalf("testingdock: container creation failure: %s", err.Error())
 	}
@@ -207,8 +207,8 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 			c.t.Fatalf("testingdock: container disconnect failure: %s", err.Error())
 		}
 		printf("(cancel) %-25s (%s) - container disconnected from: %s", c.Name, c.ID, c.network.name)
-		timeout := time.Second * 5
-		if err := c.cli.ContainerStop(ctx, c.ID, &timeout); err != nil {
+		timeout := 5 // seconds
+		if err := c.cli.ContainerStop(ctx, c.ID, container.StopOptions{Timeout: &timeout}); err != nil {
 			c.t.Fatalf("testingdock: container stop failure: %s", err.Error())
 		}
 		printf("(cancel) %-25s (%s) - container stopped", c.Name, c.ID)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 )
@@ -113,8 +114,8 @@ func (n *Network) initialCleanup(ctx context.Context) {
 			for _, nnn := range cc.NetworkSettings.Networks {
 				if nnn.NetworkID == nn.ID {
 					if isOwnedByTestingdock(cc.Labels) {
-						timeout := time.Second * 10
-						err = n.cli.ContainerStop(ctx, cc.ID, &timeout)
+						timeout := 10 // seconds
+						err = n.cli.ContainerStop(ctx, cc.ID, container.StopOptions{Timeout: &timeout})
 						if err != nil {
 							n.t.Fatalf("testingdock: container stop failure: %s", err.Error())
 						}
