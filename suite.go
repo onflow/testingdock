@@ -6,8 +6,9 @@
 //
 // Testingdock also makes use of the 'flag' package to set global variables.
 // Run `flag.Parse()` in your test suite main function. Possible flags are:
-//  -testingdock.sequential (spawn containers sequentially instead of parallel)
-//  -testingdock.verbose (verbose logging)
+//
+//	-testingdock.sequential (spawn containers sequentially instead of parallel)
+//	-testingdock.verbose (verbose logging)
 package testingdock
 
 import (
@@ -30,12 +31,13 @@ var registry map[string]*Suite
 // SpawnSequential controls whether to spawn child containers in parallel
 // or sequentially. This doesn't spawn
 // all containers in parallel, only the ones that are on the same hierarchy level, e.g.:
-//  // c1 and c2 are started in parallel after the network
-//  network.After(c1)
-//  network.After(c2)
-//  // c3 and c4 are started in parallel after c1
-//  c1.After(c3)
-//  c1.After(c4)
+//
+//	// c1 and c2 are started in parallel after the network
+//	network.After(c1)
+//	network.After(c2)
+//	// c3 and c4 are started in parallel after c1
+//	c1.After(c3)
+//	c1.After(c4)
 var SpawnSequential bool
 
 // Verbose logging
