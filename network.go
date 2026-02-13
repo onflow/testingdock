@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 )
 
@@ -46,7 +46,7 @@ func newNetwork(t testing.TB, c *client.Client, opts NetworkOpts) *Network {
 func (n *Network) start(ctx context.Context) {
 	n.initialCleanup(ctx)
 
-	res, err := n.cli.NetworkCreate(ctx, n.name, types.NetworkCreate{
+	res, err := n.cli.NetworkCreate(ctx, n.name, network.CreateOptions{
 		Labels: n.labels,
 	})
 	if err != nil {
@@ -64,7 +64,7 @@ func (n *Network) start(ctx context.Context) {
 	}
 	printf("(setup ) %-25s (%s) - network created", n.name, n.id)
 
-	ni, err := n.cli.NetworkInspect(ctx, n.id, types.NetworkInspectOptions{
+	ni, err := n.cli.NetworkInspect(ctx, n.id, network.InspectOptions{
 		Verbose: false,
 	})
 	if err != nil {
@@ -101,12 +101,12 @@ func (n *Network) initialCleanup(ctx context.Context) {
 	networkListArgs := filters.NewArgs()
 	networkListArgs.Add("name", n.name)
 
-	networks, err := n.cli.NetworkList(ctx, types.NetworkListOptions{Filters: networkListArgs})
+	networks, err := n.cli.NetworkList(ctx, network.ListOptions{Filters: networkListArgs})
 	if err != nil {
 		n.t.Fatalf("testingdock: network listing failure: %s", err.Error())
 	}
 	for _, nn := range networks {
-		containers, err := n.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+		containers, err := n.cli.ContainerList(ctx, container.ListOptions{All: true})
 		if err != nil {
 			n.t.Fatalf("testingdock: container list failure: %s", err.Error())
 		}
@@ -119,7 +119,7 @@ func (n *Network) initialCleanup(ctx context.Context) {
 						if err != nil {
 							n.t.Fatalf("testingdock: container stop failure: %s", err.Error())
 						}
-						if err = n.cli.ContainerRemove(ctx, cc.ID, types.ContainerRemoveOptions{
+						if err = n.cli.ContainerRemove(ctx, cc.ID, container.RemoveOptions{
 							RemoveVolumes: true,
 							Force:         true,
 						}); err != nil {
