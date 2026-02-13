@@ -5,7 +5,7 @@ A Go library for managing Docker containers and networks in integration tests. D
 ## Install
 
 ```bash
-go get github.com/dapperlabs/testingdock
+go get github.com/onflow/testingdock
 ```
 
 Requires Go 1.22+ and Docker SDK v28.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dapperlabs/testingdock"
+	"github.com/onflow/testingdock"
 )
 
 func TestNetwork_Start(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	_ "github.com/lib/pq"
 
-	"github.com/dapperlabs/testingdock"
+	"github.com/onflow/testingdock"
 )
 
 func TestContainer_Start(t *testing.T) {
