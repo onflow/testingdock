@@ -1,4 +1,4 @@
-module github.com/dapperlabs/testingdock
+module github.com/onflow/testingdock
 
 go 1.24.0
 

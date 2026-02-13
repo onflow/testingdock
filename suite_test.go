@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dapperlabs/testingdock"
+	"github.com/onflow/testingdock"
 )
 
 func TestMain(m *testing.M) {
