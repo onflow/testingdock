@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -15,9 +14,9 @@ import (
 	"time"
 
 	clicfg "github.com/docker/cli/cli/config"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 )
 
@@ -167,7 +166,7 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 	imageListArgs := filters.NewArgs()
 	imageListArgs.Add("reference", c.ccfg.Image)
 
-	images, err := c.cli.ImageList(ctx, types.ImageListOptions{Filters: imageListArgs})
+	images, err := c.cli.ImageList(ctx, image.ListOptions{Filters: imageListArgs})
 	if err != nil {
 		c.t.Fatalf("testingdock: image listing failure: %s", err.Error())
 	}
@@ -178,7 +177,7 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 		if err != nil {
 			c.t.Fatalf("testingdock: image downloading failure of '%s': %s", c.ccfg.Image, err.Error())
 		}
-		if _, err = io.Copy(ioutil.Discard, img); err != nil {
+		if _, err = io.Copy(io.Discard, img); err != nil {
 			c.t.Fatalf("image pull response read failure: %s", err.Error())
 		}
 		if err = img.Close(); err != nil {
@@ -215,7 +214,7 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 	}
 
 	// start the container finally
-	if err = c.cli.ContainerStart(ctx, c.ID, types.ContainerStartOptions{}); err != nil {
+	if err = c.cli.ContainerStart(ctx, c.ID, container.StartOptions{}); err != nil {
 		c.t.Fatalf("testingdock: container start failure: %s", err.Error())
 	}
 
@@ -227,7 +226,7 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 	// start container logging
 	if Verbose {
 		go func() {
-			reader, gerr := c.cli.ContainerLogs(ctx, cont.ID, types.ContainerLogsOptions{
+			reader, gerr := c.cli.ContainerLogs(ctx, cont.ID, container.LogsOptions{
 				ShowStdout: true,
 				ShowStderr: true,
 				Follow:     true,
@@ -290,10 +289,10 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 }
 
 // Find containers by the given name.
-func findContainerByName(ctx context.Context, cli *client.Client, name string) ([]types.Container, error) {
+func findContainerByName(ctx context.Context, cli *client.Client, name string) ([]container.Summary, error) {
 	containerListArgs := filters.NewArgs()
 	containerListArgs.Add("name", name)
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{
+	containers, err := cli.ContainerList(ctx, container.ListOptions{
 		Filters: containerListArgs,
 		All:     true, // also list stopped containers
 	})
@@ -314,7 +313,7 @@ func (c *Container) initialCleanup(ctx context.Context) {
 	}
 	for _, cont := range containers {
 		if isOwnedByTestingdock(cont.Labels) {
-			if err = c.cli.ContainerRemove(ctx, cont.ID, types.ContainerRemoveOptions{
+			if err = c.cli.ContainerRemove(ctx, cont.ID, container.RemoveOptions{
 				Force:         true,
 				RemoveVolumes: true,
 				RemoveLinks:   false,
@@ -385,7 +384,7 @@ func (c *Container) remove() {
 		return
 	}
 
-	if err := c.cli.ContainerRemove(context.TODO(), c.ID, types.ContainerRemoveOptions{
+	if err := c.cli.ContainerRemove(context.TODO(), c.ID, container.RemoveOptions{
 		Force:         true,
 		RemoveVolumes: true,
 	}); err != nil {
@@ -444,7 +443,7 @@ InfLoop:
 
 // wrapper around cli.ImagePull to fill ImagePullOptions with authentication information, if any.
 func (c *Container) imagePull(ctx context.Context) (io.ReadCloser, error) {
-	pullOptions := types.ImagePullOptions{}
+	pullOptions := image.PullOptions{}
 
 	// https://github.com/docker/distribution/blob/master/reference/reference.go#L7
 	//
@@ -526,7 +525,7 @@ func healthCheckRunning() HealthCheckFunc {
 // Inspect gives container information in JSON format, similar to the 'docker inspect'
 // command. The container must be running for this to work, otherwise it will return
 // an error.
-func (c *Container) Inspect(ctx context.Context) (*types.ContainerJSON, error) {
+func (c *Container) Inspect(ctx context.Context) (*container.InspectResponse, error) {
 	cjson, err := c.cli.ContainerInspect(ctx, c.ID)
 	if err != nil {
 		return nil, err
