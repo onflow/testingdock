@@ -18,6 +18,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	"github.com/hashicorp/go-multierror"
 )
 
 // HealthCheckFunc is the type of a health checking function, which is supposed
@@ -111,7 +112,7 @@ type Container struct { // nolint: maligned
 	healthchecktimeout time.Duration
 	// children are dependencies that are started after the main container
 	children []*Container
-	cancel   func()
+	cancel   func() error
 	resetF   ResetFunc
 	closed   bool
 	removed  bool
@@ -198,19 +199,20 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 
 	c.ID = cont.ID
 
-	c.cancel = func() {
+	c.cancel = func() error {
 		if c.closed {
-			return
+			return nil
 		}
 		if err := c.cli.NetworkDisconnect(ctx, c.network.id, c.ID, true); err != nil {
-			c.t.Fatalf("testingdock: container disconnect failure: %s", err.Error())
+			return fmt.Errorf("testingdock: container disconnect failure: %w", err)
 		}
 		printf("(cancel) %-25s (%s) - container disconnected from: %s", c.Name, c.ID, c.network.name)
 		timeout := 5 // seconds
 		if err := c.cli.ContainerStop(ctx, c.ID, container.StopOptions{Timeout: &timeout}); err != nil {
-			c.t.Fatalf("testingdock: container stop failure: %s", err.Error())
+			return fmt.Errorf("testingdock: container stop failure: %w", err)
 		}
 		printf("(cancel) %-25s (%s) - container stopped", c.Name, c.ID)
+		return nil
 	}
 
 	// start the container finally
@@ -331,67 +333,71 @@ func (c *Container) initialCleanup(ctx context.Context) {
 // 'cancel' function set in the Container struct.
 // Implements io.Closer interface.
 func (c *Container) close() error {
+	var errs *multierror.Error
 	if SpawnSequential {
 		for _, cont := range c.children {
-			cont.close() // nolint: errcheck
+			errs = multierror.Append(errs, cont.close())
 		}
 	} else {
-		var wg sync.WaitGroup
-
-		wg.Add(len(c.children))
+		var wg multierror.Group
 		for _, cont := range c.children {
-			go func(cont *Container) {
-				defer wg.Done()
-				cont.close() // nolint: errcheck
-			}(cont)
+			wg.Go(cont.close)
 		}
-		wg.Wait()
+		errs = wg.Wait()
 	}
 
 	// if the container failed to start c.cancel will not be set
 	if c.cancel != nil {
-		c.cancel()
+		if err := c.cancel(); err != nil {
+			errs = multierror.Append(errs, err)
+		} else {
+			c.closed = true
+		}
+	} else {
+		c.closed = true
 	}
 
-	c.closed = true
-	return nil
+	return errs.ErrorOrNil()
 }
 
 // remove removes/cleans up the container
-func (c *Container) remove() {
+// errors are propagated up to the network, as removal can be parallelized
+// and t.Fatal should only be called in the main goroutine
+func (c *Container) remove() error {
 	if !c.closed {
-		c.t.Fatalf("testingdock: container removal failed, please close containers first")
+		return fmt.Errorf("testingdock: container removal failed, please close containers first")
 	}
 
+	var errs *multierror.Error
 	if SpawnSequential {
 		for _, cont := range c.children {
-			cont.remove() // nolint: errcheck
+			err := cont.remove()
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
 		}
 	} else {
-		var wg sync.WaitGroup
-
-		wg.Add(len(c.children))
+		var wg multierror.Group
 		for _, cont := range c.children {
-			go func(cont *Container) {
-				defer wg.Done()
-				cont.remove() // nolint: errcheck
-			}(cont)
+			wg.Go(cont.remove)
 		}
-		wg.Wait()
+		errs = wg.Wait()
 	}
 
 	if c.removed {
-		return
+		return errs.ErrorOrNil()
 	}
 
 	if err := c.cli.ContainerRemove(context.TODO(), c.ID, container.RemoveOptions{
 		Force:         true,
 		RemoveVolumes: true,
 	}); err != nil {
-		c.t.Fatalf("testingdock: container removal failure: %s", err.Error())
+		errs = multierror.Append(errs, fmt.Errorf("testingdock: container removal failure: %w", err))
+	} else {
+		c.removed = true
+		printf("(remove ) %-25s (%s) - container removed/cleaned up", c.Name, c.ID)
 	}
-	c.removed = true
-	printf("(remove ) %-25s (%s) - container removed/cleaned up", c.Name, c.ID)
+	return errs.ErrorOrNil()
 }
 
 // After adds a child container (dependency, sort of)

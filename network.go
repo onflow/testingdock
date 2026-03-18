@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/hashicorp/go-multierror"
 )
 
 // NetworkOpts is used when creating a new network.
@@ -148,21 +149,17 @@ func (n *Network) initialCleanup(ctx context.Context) {
 // children containers if any are set in the Network struct.
 // Implements io.Closer interface.
 func (n *Network) close() error {
+	var errs *multierror.Error
 	if SpawnSequential {
 		for _, cont := range n.children {
-			cont.close() // nolint: errcheck
+			errs = multierror.Append(errs, cont.close())
 		}
 	} else {
-		var wg sync.WaitGroup
-
-		wg.Add(len(n.children))
+		var wg multierror.Group
 		for _, cont := range n.children {
-			go func(cont *Container) {
-				defer wg.Done()
-				cont.close() // nolint: errcheck
-			}(cont)
+			wg.Go(cont.close)
 		}
-		wg.Wait()
+		errs = wg.Wait()
 	}
 
 	// if the network failed to start n.cancel will not be set
@@ -171,23 +168,17 @@ func (n *Network) close() error {
 	}
 
 	n.closed = true
-	return nil
+	return errs.ErrorOrNil()
 }
 
 // remove removes all the containers in the network.
 func (n *Network) remove() error {
-	var wg sync.WaitGroup
+	var wg multierror.Group
 
-	wg.Add(len(n.children))
 	for _, cont := range n.children {
-		go func(cont *Container) {
-			defer wg.Done()
-			cont.remove() // nolint: errcheck
-		}(cont)
+		wg.Go(cont.remove)
 	}
-	wg.Wait()
-
-	return nil
+	return wg.Wait().ErrorOrNil()
 }
 
 // After adds a child container to the current network configuration.
