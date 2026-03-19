@@ -2,7 +2,6 @@ package testingdock
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -76,23 +75,25 @@ func (n *Network) start(ctx context.Context) {
 	printf("(setup ) %-25s (%s) - network got gateway ip: %s", n.name, n.id, n.gateway)
 
 	// start child containers
+	var errs *multierror.Error
 	if SpawnSequential {
 		for _, cont := range n.children {
-			cont.Start(ctx)
+			errs = multierror.Append(errs, cont.Start(ctx))
 		}
 	} else {
 		printf("(setup ) %-25s (%s) - network is spawning %d child containers in parallel", n.name, n.id, len(n.children))
 
-		var wg sync.WaitGroup
-
-		wg.Add(len(n.children))
+		var wg multierror.Group
 		for _, cont := range n.children {
-			go func(cont *Container) {
-				defer wg.Done()
-				cont.Start(ctx)
-			}(cont)
+			wg.Go(func() error {
+				return cont.Start(ctx)
+			})
 		}
-		wg.Wait()
+		errs = wg.Wait()
+	}
+	if err := errs.ErrorOrNil(); err != nil {
+		n.cancel()
+		n.t.Fatalf("testingdock: network start failure: %s", err.Error())
 	}
 }
 

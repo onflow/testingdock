@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -159,9 +158,9 @@ func newContainer(t testing.TB, c *client.Client, opts ContainerOpts) *Container
 }
 
 // Start actually starts a docker container. This may also pull images.
-func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
+func (c *Container) Start(ctx context.Context) error { // nolint: gocyclo
 	if c.network == nil {
-		c.t.Fatalf("testingdock: Container %s not added to any network!", c.Name)
+		return fmt.Errorf("testingdock: Container %s not added to any network!", c.Name)
 	}
 
 	imageListArgs := filters.NewArgs()
@@ -169,20 +168,20 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 
 	images, err := c.cli.ImageList(ctx, image.ListOptions{Filters: imageListArgs})
 	if err != nil {
-		c.t.Fatalf("testingdock: image listing failure: %s", err.Error())
+		return fmt.Errorf("testingdock: image listing failure: %w", err)
 	}
 
 	if len(images) == 0 || c.forcePull {
 		printf("(setup ) %-25s - pulling image", c.ccfg.Image)
 		img, err := c.imagePull(ctx)
 		if err != nil {
-			c.t.Fatalf("testingdock: image downloading failure of '%s': %s", c.ccfg.Image, err.Error())
+			return fmt.Errorf("testingdock: image downloading failure of '%s': %w", c.ccfg.Image, err)
 		}
 		if _, err = io.Copy(io.Discard, img); err != nil {
-			c.t.Fatalf("image pull response read failure: %s", err.Error())
+			return fmt.Errorf("image pull response read failure: %w", err)
 		}
 		if err = img.Close(); err != nil {
-			c.t.Fatalf("testingdock: image closing failure: %s", err.Error())
+			return fmt.Errorf("testingdock: image closing failure: %w", err)
 		}
 		printf("(setup) %-25s - successfully pulled image", c.ccfg.Image)
 	}
@@ -194,7 +193,7 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 
 	cont, err := c.cli.ContainerCreate(ctx, c.ccfg, &hcfg, nil, nil, c.Name)
 	if err != nil {
-		c.t.Fatalf("testingdock: container creation failure: %s", err.Error())
+		return fmt.Errorf("testingdock: container creation failure: %w", err)
 	}
 
 	c.ID = cont.ID
@@ -217,7 +216,7 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 
 	// start the container finally
 	if err = c.cli.ContainerStart(ctx, c.ID, container.StartOptions{}); err != nil {
-		c.t.Fatalf("testingdock: container start failure: %s", err.Error())
+		return fmt.Errorf("testingdock: container start failure: %w", err)
 	}
 
 	c.closed = false
@@ -267,27 +266,28 @@ func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
 		}()
 	}
 
-	c.executeHealthCheck(ctx)
+	if err := c.executeHealthCheck(ctx); err != nil {
+		return err
+	}
 
 	// start children
+	var errs *multierror.Error
 	if SpawnSequential {
 		for _, cont := range c.children {
-			cont.Start(ctx)
+			errs = multierror.Append(errs, cont.Start(ctx))
 		}
 	} else {
 		printf("(setup ) %-25s (%s) - container is spawning %d child containers in parallel", c.Name, c.ID, len(c.children))
 
-		var wg sync.WaitGroup
-
-		wg.Add(len(c.children))
+		var wg multierror.Group
 		for _, cont := range c.children {
-			go func(cont *Container) {
-				defer wg.Done()
-				cont.Start(ctx)
-			}(cont)
+			wg.Go(func() error {
+				return cont.Start(ctx)
+			})
 		}
-		wg.Wait()
+		errs = wg.Wait()
 	}
+	return errs.ErrorOrNil()
 }
 
 // Find containers by the given name.
@@ -418,7 +418,9 @@ func (c *Container) reset(ctx context.Context) {
 	c.closed = false
 	c.removed = false
 
-	c.executeHealthCheck(ctx)
+	if err := c.executeHealthCheck(ctx); err != nil {
+		c.t.Fatalf("testingdock: container reset failure: %s", err.Error())
+	}
 
 	for _, cc := range c.children {
 		cc.reset(ctx)
@@ -429,14 +431,14 @@ func (c *Container) reset(ctx context.Context) {
 
 // Blocks until either the healthcheck returns no error or the context
 // is cancelled.
-func (c *Container) executeHealthCheck(ctx context.Context) {
+func (c *Container) executeHealthCheck(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, c.healthchecktimeout)
 	defer cancel()
 InfLoop:
 	for {
 		select {
 		case <-ctx.Done():
-			c.t.Fatalf("health check failure: %s", ctx.Err())
+			return fmt.Errorf("health check failure: %w", ctx.Err())
 		case <-time.After(1 * time.Second):
 			if err := c.healthcheck(ctx, c); err != nil {
 				printf("(setup ) %-25s (%s) - container health failure: %s", c.Name, c.ID, err.Error())
@@ -445,6 +447,7 @@ InfLoop:
 			break InfLoop
 		}
 	}
+	return nil
 }
 
 // wrapper around cli.ImagePull to fill ImagePullOptions with authentication information, if any.
