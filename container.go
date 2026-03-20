@@ -147,6 +147,7 @@ func newContainer(t testing.TB, c *client.Client, opts ContainerOpts) *Container
 		hcfg:               opts.HostConfig,
 		resetF:             opts.Reset,
 		Image:              opts.Config.Image,
+		removed:            true,
 	}
 
 	// set default healthcheck
@@ -196,6 +197,7 @@ func (c *Container) Start(ctx context.Context) error { // nolint: gocyclo
 		return fmt.Errorf("testingdock: container creation failure: %w", err)
 	}
 
+	c.removed = false
 	c.ID = cont.ID
 
 	c.cancel = func() error {
@@ -220,7 +222,6 @@ func (c *Container) Start(ctx context.Context) error { // nolint: gocyclo
 	}
 
 	c.closed = false
-	c.removed = false
 
 	printf("(setup ) %-25s (%s) - container started", c.Name, c.ID)
 
