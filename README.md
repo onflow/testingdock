@@ -1,4 +1,4 @@
-# testingdock
+# testingdock — Docker-Based Integration Test Framework for Go
 
 A Go library for managing Docker containers and networks in integration tests. Define container dependencies as a tree, and testingdock starts them in parallel with health checks, then tears everything down when the test finishes.
 
@@ -8,7 +8,7 @@ A Go library for managing Docker containers and networks in integration tests. D
 go get github.com/onflow/testingdock
 ```
 
-Requires Go 1.22+ and Docker SDK v28.
+Requires Go 1.24+ and Docker SDK v28.
 
 ## Usage
 
@@ -96,3 +96,12 @@ Pass these via `go test`:
 
 This library creates networks and containers under the label `owner=testingdock`.
 Resources with this label are considered owned by testingdock and may be aggressively cleaned up on startup and teardown. Existing containers or networks with the same name that were **not** created by testingdock will cause tests to abort.
+
+## About Flow
+
+This repo is part of the [Flow network](https://flow.com), a Layer 1 blockchain built for consumer applications, AI agents, and DeFi at scale.
+
+- Developer docs: https://developers.flow.com
+- Cadence language: https://cadence-lang.org
+- Community: [Flow Discord](https://discord.gg/flow) · [Flow Forum](https://forum.flow.com)
+- Governance: [Flow Improvement Proposals](https://github.com/onflow/flips)
